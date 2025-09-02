@@ -6,7 +6,22 @@
         <p>Rejoignez TaskForce pour optimiser votre gestion de tâches</p>
       </div>
       
-      <form class="signup-form" @submit.prevent="handleSignup">
+      <!-- Message de succès -->
+      <div v-if="successMessage" class="success-message">
+        <h3>🎉 Inscription réussie !</h3>
+        <p>{{ successMessage }}</p>
+        <button class="btn-success" @click="goToHome">Retour à l'accueil</button>
+      </div>
+      
+      <!-- Message d'erreur -->
+      <div v-if="errorMessage" class="error-message">
+        <h3>❌ Erreur</h3>
+        <p>{{ errorMessage }}</p>
+        <button class="btn-error" @click="clearError">Réessayer</button>
+      </div>
+      
+      <!-- Formulaire d'inscription -->
+      <form v-if="!successMessage" class="signup-form" @submit.prevent="handleSignup">
         <div class="form-group">
           <label for="firstName">Prénom</label>
           <input 
@@ -72,10 +87,12 @@
           </select>
         </div>
         
-        <button type="submit" class="btn-signup-submit">Créer mon compte</button>
+        <button type="submit" class="btn-signup-submit" :disabled="isLoading">
+          {{ isLoading ? 'Création en cours...' : 'Créer mon compte' }}
+        </button>
       </form>
       
-      <div class="signup-footer">
+      <div v-if="!successMessage" class="signup-footer">
         <p>Déjà un compte ? <router-link to="/" class="link-login">Se connecter</router-link></p>
       </div>
     </div>
@@ -94,17 +111,58 @@ export default {
         password: '',
         confirmPassword: '',
         role: ''
-      }
+      },
+      isLoading: false,
+      successMessage: '',
+      errorMessage: ''
     }
   },
   methods: {
-    handleSignup() {
+    async handleSignup() {
       if (this.form.password !== this.form.confirmPassword) {
-        alert('Les mots de passe ne correspondent pas')
+        this.errorMessage = 'Les mots de passe ne correspondent pas'
         return
       }
       
-      console.log('Inscription:', this.form)
+      this.isLoading = true
+      this.errorMessage = ''
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: this.form.firstName,
+            lastName: this.form.lastName,
+            email: this.form.email,
+            password: this.form.password,
+            role: this.form.role
+          })
+        })
+        
+        const data = await response.json()
+        
+        if (response.ok) {
+          this.successMessage = `Bienvenue ${this.form.firstName} ! Votre compte a été créé avec succès.`
+        } else {
+          this.errorMessage = data.error || 'Erreur lors de l\'inscription'
+        }
+      } catch (error) {
+        this.errorMessage = 'Erreur de connexion au serveur'
+        console.error('Erreur:', error)
+      } finally {
+        this.isLoading = false
+      }
+    },
+    
+    goToHome() {
+      this.$router.push('/')
+    },
+    
+    clearError() {
+      this.errorMessage = ''
     }
   }
 }
@@ -144,6 +202,54 @@ export default {
 .signup-header p {
   color: #6b778c;
   font-size: 1.1rem;
+}
+
+.success-message, .error-message {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.success-message h3, .error-message h3 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.btn-success, .btn-error {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.btn-error {
+  background: #dc3545;
+}
+
+.btn-success:hover {
+  background: #218838;
+}
+
+.btn-error:hover {
+  background: #c82333;
 }
 
 .signup-form {
@@ -198,8 +304,13 @@ export default {
   margin-top: 1rem;
 }
 
-.btn-signup-submit:hover {
+.btn-signup-submit:hover:not(:disabled) {
   background: #0047b3;
+}
+
+.btn-signup-submit:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
 }
 
 .signup-footer {
